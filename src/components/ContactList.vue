@@ -12,20 +12,26 @@
 </template>
 
 <script setup>
-import { ref, onMounted, defineEmits } from 'vue';
 import axios from 'axios';
 import { useAuthStore } from '../stores/auth';
+import { ref, onMounted, defineEmits, watch } from 'vue';
 
 const conversations = ref([]);
 const emits = defineEmits(['select-user']);
 const authStore = useAuthStore();
 
 const fetchConversations = async () => {
+  console.log('fetchConversations called.');
   const userId = authStore.user?.id;
-  if (!userId) return;
+  console.log('Current userId in fetchConversations:', userId);
+  if (!userId) {
+    console.log('userId is not available, returning.');
+    return;
+  }
 
   try {
     const response = await axios.get(`http://localhost:3000/api/conversations?userId=${userId}`);
+    console.log('ContactList API Response:', response.data);
     conversations.value = response.data;
   } catch (error) {
     console.error("Error fetching conversations:", error);
@@ -51,7 +57,10 @@ const formatTimestamp = (timestamp) => {
     return `${diffInDays}d ago`;
 };
 
-onMounted(() => {
-  fetchConversations();
-});
+watch(() => authStore.user?.id, (newUserId) => {
+  console.log('authStore.user.id changed to:', newUserId);
+  if (newUserId) {
+    fetchConversations();
+  }
+}, { immediate: true });
 </script>

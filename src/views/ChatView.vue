@@ -18,7 +18,7 @@
         <div class="card-body pt-5" id="kt_chat_contacts_body">
           <!--begin::List-->
           <div class="scroll-y me-n5 pe-5 h-200px h-lg-auto" data-kt-scroll="true">
-            <div v-if="searchQuery.length > 0">
+            <div v-show="searchQuery.length > 0">
                 <div v-for="user in searchResults" :key="user.id" @click="startConversation(user)" class="d-flex flex-stack py-4 border-bottom border-gray-300 border-bottom-dashed">
                     <div class="d-flex align-items-center">
                         <div class="symbol symbol-45px symbol-circle">
@@ -32,7 +32,7 @@
                 </div>
                  <p v-if="!searchResults.length && searchQuery.length" class="text-muted text-center pt-5">No users found.</p>
             </div>
-            <ContactList v-else @select-user="handleSelectUser" />
+            <ContactList v-show="searchQuery.length === 0" @select-user="handleSelectUser" />
           </div>
           <!--end::List-->
         </div>
@@ -50,7 +50,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
+import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue';
 import axios from 'axios';
 import ContactList from '../components/ContactList.vue';
 import MessageWindow from '../components/MessageWindow.vue';
@@ -62,6 +62,7 @@ const authStore = useAuthStore();
 const chatStore = useChatStore();
 const searchQuery = ref('');
 const searchResults = ref([]);
+let searchTimeout = null;
 
 // currentUser를 computed 속성으로 변경하여 authStore.user의 변화에 반응하도록 합니다.
 const currentUser = computed(() => authStore.user);
@@ -70,18 +71,31 @@ const handleSelectUser = (user) => {
   selectedUser.value = user;
 };
 
-const searchUsers = async () => {
+const searchUsers = () => {
+  console.log('Searching for:', searchQuery.value);
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(async () => {
     if (searchQuery.value.length < 2) {
-        searchResults.value = [];
-        return;
+      searchResults.value = [];
+      return;
     }
     try {
-        const response = await axios.get(`http://localhost:3000/api/users?search=${searchQuery.value}`);
-        // Correctly filter out the current user from search results
-        searchResults.value = response.data.filter(user => user.id !== currentUser.value?.id);
+      const response = await axios.get(`http://localhost:3000/api/users?search=${searchQuery.value}`);
+      console.log('API Response:', response.data);
+      searchResults.value = response.data.filter(user => user.id !== currentUser.value?.id);
+      console.log('Search results:', searchResults.value);
+
+      // Re-initialize KTScroll after DOM update to prevent errors
+      nextTick(() => {
+        if (window.KTScroll) {
+          console.log('Re-initializing KTScroll components...');
+          KTScroll.reinit();
+        }
+      });
     } catch (error) {
-        console.error("Error searching users:", error);
+      console.error("Error searching users:", error);
     }
+  }, 300);
 };
 
 const startConversation = async (user) => {

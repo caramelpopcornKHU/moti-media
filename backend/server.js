@@ -4,6 +4,24 @@ const { Server } = require("socket.io");
 const mysql = require('mysql2');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+// Set up multer for file storage
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadPath = path.join(__dirname, '../public/metronic/media/avatars/');
+    fs.mkdirSync(uploadPath, { recursive: true });
+    cb(null, uploadPath);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname))
+  }
+});
+
+const upload = multer({ storage: storage });
 
 const app = express();
 const server = http.createServer(app);
@@ -18,6 +36,7 @@ const port = 3000;
 
 app.use(cors());
 app.use(bodyParser.json());
+app.use('/metronic/media/avatars', express.static(path.join(__dirname, '../public/metronic/media/avatars')));
 
 // MariaDB connection
 const db = mysql.createConnection({
@@ -39,6 +58,8 @@ db.connect(err => {
   // Create tables if they don't exist
   const createTablesQueries = `
     ALTER TABLE users ADD COLUMN IF NOT EXISTS passion_type VARCHAR(255) NULL;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_image_url VARCHAR(255) DEFAULT '/metronic/media/avatars/blank.png';
+    ALTER TABLE messages ADD COLUMN IF NOT EXISTS conversation_id INT NOT NULL;
 
     CREATE TABLE IF NOT EXISTS comments (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -153,7 +174,7 @@ app.get('/api/users/:id', (req, res) => {
   const userId = req.params.id;
   const query = `
     SELECT 
-        id, username, email, created_at, passion_type,
+        id, username, email, created_at, passion_type, profile_image_url,
         (SELECT COUNT(*) FROM followers WHERE following_id = users.id) AS followers_count,
         (SELECT COUNT(*) FROM followers WHERE follower_id = users.id) AS following_count
     FROM users
@@ -228,6 +249,19 @@ app.post('/api/users', (req, res) => {
   });
 });
 
+app.post('/api/users/:id/profile-image', upload.single('profile_image'), (req, res) => {
+  const userId = req.params.id;
+  const imageUrl = `/metronic/media/avatars/${req.file.filename}`;
+
+  db.query('UPDATE users SET profile_image_url = ? WHERE id = ?', [imageUrl, userId], (err, result) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).send('Error updating profile image');
+    }
+    res.status(200).send({ profile_image_url: imageUrl });
+  });
+});
+
 // User login
 app.post('/api/login', (req, res) => {
   const { email, password } = req.body;
@@ -245,7 +279,7 @@ app.post('/api/login', (req, res) => {
     // In a real application, compare hashed passwords
     if (user.password === password) {
       // For simplicity, returning user ID and username. In real app, generate a token (JWT)
-      res.status(200).json({ id: user.id, username: user.username, email: user.email });
+      res.status(200).json({ id: user.id, username: user.username, email: user.email, profile_image_url: user.profile_image_url });
     } else {
       res.status(401).send('Invalid credentials');
     }
@@ -380,6 +414,19 @@ app.get('/api/posts/:id', (req, res) => {
   });
 });
 
+// Create a new post
+app.post('/api/posts', (req, res) => {
+  const { user_id, title, content } = req.body;
+  const newPost = { user_id, title, content };
+  db.query('INSERT INTO posts SET ?', newPost, (err, result) => {
+    if (err) {
+      console.error('Error creating post:', err);
+      return res.status(500).send('Error creating post');
+    }
+    res.status(201).send({ id: result.insertId, ...newPost });
+  });
+});
+
 
 // ... (existing post APIs)
 
@@ -473,7 +520,39 @@ app.get('/api/posts/:postId/likes/status', (req, res) => {
 });
 
 // --- Comment APIs ---
-// ... (existing comment APIs)
+// Get comments for a post
+app.get('/api/posts/:postId/comments', (req, res) => {
+  const postId = req.params.postId;
+  const query = `
+    SELECT c.id, c.content, c.created_at, u.username 
+    FROM comments c
+    JOIN users u ON c.user_id = u.id
+    WHERE c.post_id = ?
+    ORDER BY c.created_at DESC
+  `;
+  db.query(query, [postId], (err, results) => {
+    if (err) {
+      console.error('Error fetching comments:', err);
+      return res.status(500).send('Error fetching comments');
+    }
+    res.json(results);
+  });
+});
+
+// Add a comment to a post
+app.post('/api/posts/:postId/comments', (req, res) => {
+  const postId = req.params.postId;
+  const { user_id, content } = req.body;
+  const newComment = { post_id: postId, user_id, content };
+  db.query('INSERT INTO comments SET ?', newComment, (err, result) => {
+    if (err) {
+      console.error('Error adding comment:', err);
+      return res.status(500).send('Error adding comment');
+    }
+    res.status(201).send({ id: result.insertId, ...newComment });
+  });
+});
+
 
 // Socket.io connection
 io.on('connection', (socket) => {

@@ -1,6 +1,8 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 
+const defaultProfileImage = '/metronic/media/avatars/blank.png';
+
 export const useAuthStore = defineStore('auth', () => {
   const isLoggedIn = ref(false);
   const user = ref(null); // Add user state
@@ -9,7 +11,11 @@ export const useAuthStore = defineStore('auth', () => {
   const storedUser = localStorage.getItem('user');
   if (storedUser) {
     try {
-      user.value = JSON.parse(storedUser);
+      const userData = JSON.parse(storedUser);
+      if (!userData.profile_image_url) {
+        userData.profile_image_url = defaultProfileImage;
+      }
+      user.value = userData;
       isLoggedIn.value = true;
     } catch (e) {
       console.error("Failed to parse user from localStorage", e);
@@ -18,6 +24,9 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function login(userData) {
+    if (!userData.profile_image_url) {
+      userData.profile_image_url = defaultProfileImage;
+    }
     isLoggedIn.value = true;
     user.value = userData; // Store user data
     localStorage.setItem('user', JSON.stringify(userData));
@@ -31,5 +40,12 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('username'); // Ensure old username is cleared
   }
 
-  return { isLoggedIn, user, login, logout };
+  function updateUserProfileImage(newImageUrl) {
+    if (user.value) {
+      user.value.profile_image_url = newImageUrl;
+      localStorage.setItem('user', JSON.stringify(user.value));
+    }
+  }
+
+  return { isLoggedIn, user, login, logout, updateUserProfileImage };
 });

@@ -19,7 +19,7 @@
                   <div class="d-flex align-items-center">
                     <!--begin::Avatar-->
                     <div class="symbol symbol-50px me-5">
-                      <img src="/metronic/media/avatars/300-1.jpg" class="" alt="" />
+                      <img src="/metronic/media/avatars/blank.png" class="" alt="" />
                     </div>
                     <!--end::Avatar-->
                     <!--begin::Info-->
@@ -38,6 +38,7 @@
                 <!--end::Card header-->
                 <!--begin::Card body-->
                 <div class="card-body">
+                  <input type="text" class="form-control form-control-solid mb-3" placeholder="Title" v-model="newPostTitle">
                   <textarea class="form-control form-control-solid mb-3" rows="3" placeholder="Share your thoughts..." v-model="newPostContent"></textarea>
                   <div class="d-flex justify-content-between align-items-center">
                     <button class="btn btn-primary" @click="createPost">Post</button>
@@ -61,7 +62,7 @@
                   <div class="d-flex align-items-center">
                     <!--begin::Avatar-->
                     <div class="symbol symbol-50px me-5">
-                      <img :src="`/metronic/media/avatars/300-${post.id % 20 + 1}.jpg`" class="" alt="" />
+                      <img src="/metronic/media/avatars/blank.png" class="" alt="" />
                     </div>
                     <!--end::Avatar-->
                     <!--begin::Info-->
@@ -432,6 +433,7 @@ export default {
   },
   data() {
     return {
+      newPostTitle: '',
       newPostContent: '',
     };
   },
@@ -455,10 +457,11 @@ export default {
       try {
         const response = await axios.post('http://localhost:3000/api/posts', {
           user_id: userId,
-          title: 'New Post', // You might want to add a title input field later
+          title: this.newPostTitle,
           content: this.newPostContent,
         });
         console.log('Post created:', response.data);
+        this.newPostTitle = '';
         this.newPostContent = ''; // Clear the input field
         await this.postsStore.fetchPosts(); // Refresh the posts list using the store
       } catch (error) {

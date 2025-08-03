@@ -17,14 +17,22 @@
                   <div class="card-body pt-9 pb-0">
                     <!--begin::Details-->
                     <div class="d-flex flex-wrap flex-sm-nowrap mb-3">
-                      <!--begin::Avatar-->
+                      '''                      <!--begin::Avatar-->
                       <div class="me-7 mb-4">
                         <div class="symbol symbol-100px symbol-lg-160px symbol-fixed position-relative">
-                          <img src="/metronic/media/avatars/300-1.jpg" alt="image" />
-                          <div class="position-absolute translate-middle bottom-0 start-100 mb-6 bg-success rounded-circle border border-4 border-body h-20px w-20px"></div>
+                          <img :src="userProfile.profile_image_url" alt="image" />
+                          <div v-if="isCurrentUserProfile" class="position-absolute translate-middle bottom-0 start-100 mb-6 bg-success rounded-circle border border-4 border-body h-20px w-20px">
+                            <label for="profile_image_upload" class="btn btn-sm btn-icon btn-active-color-primary p-0">
+                              <i class="ki-duotone ki-pencil fs-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                              </i>
+                            </label>
+                            <input id="profile_image_upload" type="file" class="d-none" @change="onFileChange">
+                          </div>
                         </div>
                       </div>
-                      <!--end::Avatar-->
+                      <!--end::Avatar-->''
                       <!--begin::Info-->
                       <div class="flex-grow-1">
                         <!--begin::Title-->
@@ -165,7 +173,7 @@
                         <div class="d-flex align-items-center">
                           <!--begin::Avatar-->
                           <div class="symbol symbol-50px me-5">
-                            <img :src="`/metronic/media/avatars/300-${post.id % 20 + 1}.jpg`" class="" alt="" />
+                            <img :src="userProfile.profile_image_url" class="" alt="" />
                           </div>
                           <!--end::Avatar-->
                           <!--begin::Info-->
@@ -249,6 +257,7 @@ export default {
         followers_count: 0,
         following_count: 0,
         passion_type: null,
+        profile_image_url: '',
       },
       userPosts: [],
       isCurrentUserProfile: false,
@@ -375,6 +384,28 @@ export default {
         alert('Failed to update like status.');
       }
     },
+    onFileChange(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const formData = new FormData();
+      formData.append('profile_image', file);
+
+      const userId = localStorage.getItem('user_id');
+      axios.post(`http://localhost:3000/api/users/${userId}/profile-image`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      }).then(response => {
+        this.userProfile.profile_image_url = response.data.profile_image_url;
+        const authStore = useAuthStore();
+        authStore.updateUserProfileImage(response.data.profile_image_url);
+        alert('Profile image updated successfully!');
+      }).catch(error => {
+        console.error('Error uploading profile image:', error);
+        alert('Failed to update profile image.');
+      });
+    }
   },
 };
 </script>

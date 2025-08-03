@@ -31,7 +31,7 @@
                       <div class="separator separator-dashed my-5"></div>
                       <h3 class="fw-bold text-gray-900 mb-3">Comments</h3>
                       <div v-if="comments.length === 0" class="text-muted mb-5">No comments yet.</div>
-                      <div v-for="comment in comments" :key="comment.id" class="mb-4">
+                      <div v-else v-for="comment in comments" :key="comment.id" class="mb-4">
                         <div class="d-flex align-items-center mb-2">
                           <div class="symbol symbol-35px symbol-circle me-3">
                             <span class="symbol-label bg-light-primary text-primary fw-bold">{{
